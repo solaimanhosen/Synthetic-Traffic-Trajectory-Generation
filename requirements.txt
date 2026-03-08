@@ -1,0 +1,9 @@
+transformers
+datasets
+trl
+accelerate
+bitsandbytes
+protobuf
+sentencepiece
+huggingface_hub 
+pandas
