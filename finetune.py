@@ -55,15 +55,17 @@ def parse_args() -> argparse.Namespace:
     # Training hyper-parameters
     parser.add_argument("--num_train_epochs", type=int, default=3)
     parser.add_argument("--learning_rate", type=float, default=2e-5)
-    parser.add_argument("--train_batch_size", type=int, default=4)
+    parser.add_argument("--train_batch_size", type=int, default=8)
     parser.add_argument("--eval_batch_size", type=int, default=4)
-    parser.add_argument("--gradient_accumulation_steps", type=int, default=4)
+    parser.add_argument("--gradient_accumulation_steps", type=int, default=2)
     parser.add_argument("--max_length", type=int, default=1024)
-    parser.add_argument("--warmup_steps", type=int, default=250)
+    parser.add_argument("--warmup_steps", type=int, default=500)
     parser.add_argument("--weight_decay", type=float, default=0.01)
-    parser.add_argument("--eval_steps", type=int, default=500)
-    parser.add_argument("--save_steps", type=int, default=500)
-    parser.add_argument("--logging_steps", type=int, default=50)
+    parser.add_argument("--eval_steps", type=int, default=1000)
+    parser.add_argument("--save_steps", type=int, default=1000)
+    parser.add_argument("--max_eval_samples", type=int, default=500,
+                    help="Cap eval set size for faster evaluation.")
+    parser.add_argument("--logging_steps", type=int, default=100)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--resume_from_checkpoint", action="store_true",
                         help="Resume training from the latest checkpoint.")
@@ -74,7 +76,7 @@ def parse_args() -> argparse.Namespace:
 # Data loading
 # ══════════════════════════════════════════════════════════════════════════════
 
-def load_datasets(train_file: str, eval_file: str, tokenizer):
+def load_datasets(train_file: str, eval_file: str, max_eval_samples: int, tokenizer):
     """Load JSONL files and apply Alpaca-style formatting."""
     eos_token = tokenizer.eos_token
 
@@ -88,10 +90,13 @@ def load_datasets(train_file: str, eval_file: str, tokenizer):
         return {"text": texts}
 
     train_ds = load_dataset("json", data_files=train_file, split="train")
-    eval_ds  = load_dataset("json", data_files=eval_file,  split="train")
+    eval_ds = load_dataset("json", data_files=eval_file, split="train")
+    if max_eval_samples and len(eval_ds) > max_eval_samples:
+        eval_ds = eval_ds.select(range(max_eval_samples))
 
-    train_ds = train_ds.map(formatting_fn, batched=True, num_proc=1)
-    eval_ds  = eval_ds.map(formatting_fn, batched=True, num_proc=1)
+    num_proc = min(os.cpu_count(), 8)
+    train_ds = train_ds.map(formatting_fn, batched=True, num_proc=num_proc)
+    eval_ds  = eval_ds.map(formatting_fn, batched=True, num_proc=num_proc)
 
     print(f"Train examples: {len(train_ds):,}")
     print(f"Eval  examples: {len(eval_ds):,}")
@@ -141,10 +146,11 @@ def build_trainer(model, tokenizer, train_ds, eval_ds, args: argparse.Namespace)
         weight_decay                = args.weight_decay,
         warmup_steps                = args.warmup_steps,
         logging_steps               = args.logging_steps,
-        save_total_limit            = 1,
+        dataset_text_field          = "text",
+        save_total_limit            = 2,
         report_to                   = "none",
         bf16                        = True,
-        optim                       = "adamw_8bit",
+        optim                       = "paged_adamw_32bit",
         lr_scheduler_type           = "cosine",
         seed                        = args.seed,
     )
@@ -185,13 +191,13 @@ def main():
     model, tokenizer = load_model_and_tokenizer(args.base_model)
 
     # 2. Load and format datasets
-    train_ds, eval_ds = load_datasets(args.train_file, args.eval_file, tokenizer)
+    train_ds, eval_ds = load_datasets(args.train_file, args.eval_file, args.max_eval_samples, tokenizer)
 
     # 3. Build trainer
     trainer = build_trainer(model, tokenizer, train_ds, eval_ds, args)
 
     # 4. Train
-    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint or None)
+    trainer.train(resume_from_checkpoint=args.resume_from_checkpoint if args.resume_from_checkpoint else None)
 
     # 5. Save
     tokenizer_dir = args.tokenizer_save_dir or args.model_save_dir

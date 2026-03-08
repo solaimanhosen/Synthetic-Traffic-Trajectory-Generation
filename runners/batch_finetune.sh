@@ -29,9 +29,10 @@ python finetune.py \
     --model_save_dir ./ngsim_model \
     --num_train_epochs 2 \
     --learning_rate 2e-5 \
-    --warmup_steps 250 \
-    --eval_steps 500 \
-    --save_steps 500 \
+    --warmup_steps 500 \
+    --eval_steps 1000 \
+    --save_steps 1000 \
+    --max_eval_samples 500 \
     --resume_from_checkpoint
 
 echo "Job completed at: $(date)"
