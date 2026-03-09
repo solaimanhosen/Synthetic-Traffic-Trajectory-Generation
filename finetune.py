@@ -59,13 +59,13 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--eval_batch_size", type=int, default=4)
     parser.add_argument("--gradient_accumulation_steps", type=int, default=2)
     parser.add_argument("--max_length", type=int, default=1024)
-    parser.add_argument("--warmup_steps", type=int, default=500)
+    parser.add_argument("--warmup_steps", type=int, default=1500)
     parser.add_argument("--weight_decay", type=float, default=0.01)
     parser.add_argument("--eval_steps", type=int, default=1000)
     parser.add_argument("--save_steps", type=int, default=1000)
     parser.add_argument("--max_eval_samples", type=int, default=500,
                     help="Cap eval set size for faster evaluation.")
-    parser.add_argument("--logging_steps", type=int, default=100)
+    parser.add_argument("--logging_steps", type=int, default=1000)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--resume_from_checkpoint", action="store_true",
                         help="Resume training from the latest checkpoint.")
@@ -164,7 +164,6 @@ def build_trainer(model, tokenizer, train_ds, eval_ds, args: argparse.Namespace)
     )
     return trainer
 
-
 # ══════════════════════════════════════════════════════════════════════════════
 # Save model
 # ══════════════════════════════════════════════════════════════════════════════
@@ -196,7 +195,23 @@ def main():
     # 3. Build trainer
     trainer = build_trainer(model, tokenizer, train_ds, eval_ds, args)
 
-    # 4. Train
+    # 4. Patch trainer state if resuming with different schedule args
+    if args.resume_from_checkpoint:
+        import glob, json as _json
+        ckpts = sorted(glob.glob(os.path.join(args.output_dir, "checkpoint-*")))
+        if ckpts:
+            state_path = os.path.join(ckpts[-1], "trainer_state.json")
+            if os.path.exists(state_path):
+                with open(state_path) as f:
+                    state = _json.load(f)
+                state["save_steps"]    = args.save_steps
+                state["eval_steps"]    = args.eval_steps
+                state["logging_steps"] = args.logging_steps
+                with open(state_path, "w") as f:
+                    _json.dump(state, f, indent=2)
+                print(f"Patched trainer_state.json in {ckpts[-1]}")
+
+    # 5. Train
     trainer.train(resume_from_checkpoint=args.resume_from_checkpoint if args.resume_from_checkpoint else None)
 
     # 5. Save

@@ -2,7 +2,7 @@
 #SBATCH --nodes=1
 #SBATCH --ntasks-per-node=1
 #SBATCH --cpus-per-task=16
-#SBATCH --time=1-12:00:00
+#SBATCH --time=3-00:00:00
 #SBATCH --mem=128G
 #SBATCH --gres=gpu:a100:1
 #SBATCH --account=meisam-lab
@@ -27,12 +27,12 @@ python finetune.py \
     --eval_file  data/ngsim_rowbyrow_eval.jsonl \
     --output_dir ./results \
     --model_save_dir ./ngsim_model \
-    --num_train_epochs 2 \
+    --num_train_epochs 1 \
     --learning_rate 2e-5 \
-    --warmup_steps 500 \
+    --warmup_steps 1500 \
     --eval_steps 1000 \
     --save_steps 1000 \
-    --max_eval_samples 500 \
+    --max_eval_samples 100 \
     --resume_from_checkpoint
 
 echo "Job completed at: $(date)"

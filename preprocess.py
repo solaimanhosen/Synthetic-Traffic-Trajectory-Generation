@@ -9,8 +9,8 @@ HISTORY_STEPS = 3
 ADD_NEIGHBORS = False
 OUTPUT_FILE = "data/ngsim_rowbyrow_wo_nei.jsonl"
 MODEL_NAME = "mistralai/Mistral-7B-Instruct-v0.3"
-TRAIN_SIZE = 100_000
-EVAL_SIZE = 20_000
+TRAIN_SIZE = None   # None = use all data except eval
+EVAL_SIZE = 100
 
 INSTRUCTION = (
     "You are a traffic simulation model. "
@@ -228,6 +228,8 @@ def format_and_split(
     dataset = dataset.map(formatting_prompts_func, batched=True, num_proc=1)
 
     total = len(dataset)
+    if train_size is None:
+        train_size = total - eval_size
     if train_size + eval_size > total:
         raise ValueError(
             f"train_size ({train_size:,}) + eval_size ({eval_size:,}) = "

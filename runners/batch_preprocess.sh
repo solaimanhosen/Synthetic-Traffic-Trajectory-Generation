@@ -21,6 +21,6 @@ echo "CUDA_VISIBLE_DEVICES: $CUDA_VISIBLE_DEVICES"
 echo "Working directory: $(pwd)"
 
 # RUN PROGRAM
-python preprocess.py > logs/ngsim_preprocess_$(date +%Y%m%d_%H%M%S).log
+python preprocess.py
 
 echo "Job completed successfully"

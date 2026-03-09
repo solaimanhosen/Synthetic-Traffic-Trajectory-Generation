@@ -4,7 +4,7 @@ Usage:
     python inference.py \
         --model_dir ./ngsim_model \
         --eval_file data/ngsim_rowbyrow_eval.jsonl \
-        --num_examples 100 \
+        --num_examples 1 \
         --output_file predictions.jsonl
 
     # Run on a single JSON string:
